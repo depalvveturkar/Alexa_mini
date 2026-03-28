@@ -11,5 +11,5 @@ pygame==2.5.2
 streamlit==1.29.0
 sounddevice==0.4.6
 SpeechRecognition==3.10.0
-PyAudio==0.2.14
 python-dateutil==2.8.2
+audio-recorder-streamlit==0.0.8

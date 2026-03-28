@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🤖 ALEXA MINI - Streamlit Web Interface (FIXED - Opens Websites)
+🤖 ALEXA MINI - Streamlit Cloud Compatible Version
 """
 
 import streamlit as st
@@ -10,10 +10,10 @@ import re
 import random
 import datetime
 import tempfile
+from io import BytesIO
 
-# Audio
-import sounddevice as sd
-from scipy.io.wavfile import write
+# Audio Recording (Browser-based)
+from audio_recorder_streamlit import audio_recorder
 import speech_recognition as sr
 
 # ML
@@ -23,7 +23,6 @@ from sklearn.neural_network import MLPClassifier
 # TTS
 from gtts import gTTS
 import base64
-from io import BytesIO
 
 # ========================================
 # 🎨 PAGE CONFIGURATION
@@ -36,7 +35,7 @@ st.set_page_config(
 )
 
 # ========================================
-# 🎨 CUSTOM CSS
+# 🎨 CUSTOM CSS (Same as before)
 # ========================================
 st.markdown("""
 <style>
@@ -110,13 +109,10 @@ st.markdown("""
 
 
 # ========================================
-# 🌐 WEBSITE OPENER FUNCTIONS
+# 🌐 WEBSITE OPENER
 # ========================================
 def open_website_button(url, label="🌐 Click Here to Open Website"):
-    """
-    Creates a prominent button/link to open website
-    This is the most reliable method in Streamlit
-    """
+    """Creates a button to open website"""
     button_html = f'''
     <a href="{url}" target="_blank" class="open-btn">
         {label}
@@ -126,27 +122,13 @@ def open_website_button(url, label="🌐 Click Here to Open Website"):
 
 
 def open_website_auto(url):
-    """
-    Attempts to auto-open using JavaScript
-    Note: May be blocked by browser pop-up blockers
-    """
+    """Auto-opens URL using JavaScript"""
     js = f'''
     <script>
         window.open("{url}", "_blank");
     </script>
     '''
     components.html(js, height=0, width=0)
-
-
-def show_website_iframe(url, height=600):
-    """
-    Shows website in an iframe (works for some sites)
-    Note: Many sites block iframe embedding
-    """
-    try:
-        st.components.v1.iframe(url, height=height, scrolling=True)
-    except:
-        st.warning("This website cannot be embedded. Please use the link above.")
 
 
 # ========================================
@@ -159,60 +141,17 @@ def load_classifier():
     model = MLPClassifier(hidden_layer_sizes=(50, 25), max_iter=500, random_state=42)
     
     training_data = [
-        # Music
         ("play music", "play_music"), ("play song", "play_music"),
-        ("play spotify", "play_music"), ("music", "play_music"),
-        ("play youtube music", "play_music"),
-        
-        # Website
         ("open youtube", "open_website"), ("open google", "open_website"),
-        ("youtube", "open_website"), ("open netflix", "open_website"),
-        ("open amazon", "open_website"), ("open instagram", "open_website"),
-        ("open github", "open_website"), ("open facebook", "open_website"),
-        
-        # Jokes
         ("tell me a joke", "jokes_fun"), ("joke", "jokes_fun"),
-        ("make me laugh", "jokes_fun"), ("funny", "jokes_fun"),
-        
-        # News
         ("news", "news"), ("show news", "news"),
-        ("national news", "news"), ("international news", "news"),
-        
-        # Cricket
         ("cricket", "cricket"), ("cricket score", "cricket"),
-        ("ipl", "cricket"), ("live score", "cricket"), ("live cricket", "cricket"),
-        
-        # Movies
         ("movie", "movies"), ("netflix", "movies"),
-        ("watch movie", "movies"), ("prime video", "movies"),
-        
-        # Shopping
-        ("shopping", "shopping"), ("amazon", "shopping"),
-        ("flipkart", "shopping"), ("buy", "shopping"),
-        
-        # Weather
         ("weather", "weather"), ("temperature", "weather"),
-        ("forecast", "weather"),
-        
-        # Time
         ("time", "date_time"), ("date", "date_time"),
-        ("what time", "date_time"), ("what day", "date_time"),
-        
-        # Calculator
         ("calculate", "calculator"), ("plus", "calculator"),
-        ("add", "calculator"), ("multiply", "calculator"),
-        ("minus", "calculator"), ("divide", "calculator"),
-        
-        # Facts
-        ("fact", "facts"), ("tell me a fact", "facts"),
-        
-        # Personality
-        ("hello", "personality"), ("hi", "personality"),
-        ("how are you", "personality"), ("thank you", "personality"),
-        
-        # Search
+        ("fact", "facts"), ("hello", "personality"),
         ("search", "general_qa"), ("who is", "general_qa"),
-        ("what is", "general_qa"),
     ]
     
     X = vectorizer.fit_transform([d[0] for d in training_data])
@@ -223,54 +162,28 @@ def load_classifier():
 
 
 # ========================================
-# 🎤 AUDIO HANDLER
+# 🎤 AUDIO HANDLER (Browser-based)
 # ========================================
-class AudioHandler:
-    def __init__(self, sample_rate=16000, duration=5):
-        self.sample_rate = sample_rate
-        self.duration = duration
-        self.audio_file = "temp_audio.wav"
-        self.recognizer = sr.Recognizer()
-    
-    def record_audio(self, status_placeholder):
-        """Record audio from microphone"""
-        try:
-            status_placeholder.warning(f"🔴 Recording for {self.duration} seconds... SPEAK NOW!")
-            
-            recording = sd.rec(
-                int(self.duration * self.sample_rate),
-                samplerate=self.sample_rate,
-                channels=1,
-                dtype='int16'
-            )
-            sd.wait()
-            write(self.audio_file, self.sample_rate, recording)
-            
-            status_placeholder.success("✅ Recording complete!")
-            return True
-            
-        except Exception as e:
-            status_placeholder.error(f"❌ Recording error: {e}")
-            return False
-    
-    def speech_to_text(self):
-        """Convert audio to text"""
-        try:
-            with sr.AudioFile(self.audio_file) as source:
-                audio = self.recognizer.record(source)
-            text = self.recognizer.recognize_google(audio, language="en-US")
-            return text
-        except sr.UnknownValueError:
-            return None
-        except Exception as e:
-            return None
-    
-    def cleanup(self):
-        try:
-            if os.path.exists(self.audio_file):
-                os.remove(self.audio_file)
-        except:
-            pass
+def speech_to_text_from_bytes(audio_bytes):
+    """Convert audio bytes to text using Google Speech Recognition"""
+    try:
+        recognizer = sr.Recognizer()
+        
+        # Convert bytes to AudioFile
+        audio_file = BytesIO(audio_bytes)
+        
+        with sr.AudioFile(audio_file) as source:
+            audio = recognizer.record(source)
+        
+        # Recognize using Google
+        text = recognizer.recognize_google(audio, language="en-US")
+        return text
+        
+    except sr.UnknownValueError:
+        return None
+    except Exception as e:
+        st.error(f"Recognition error: {e}")
+        return None
 
 
 # ========================================
@@ -297,50 +210,35 @@ def text_to_speech(text):
 
 
 # ========================================
-# ⚡ ACTION HANDLER
+# ⚡ ACTION HANDLER (Same as before)
 # ========================================
 def perform_action(intent, text):
     """Execute action based on intent"""
     text_lower = text.lower()
     
-    # Website URLs
-    websites = {
-        "youtube": ("https://www.youtube.com", "YouTube", "🎬"),
-        "google": ("https://www.google.com", "Google", "🔍"),
-        "netflix": ("https://www.netflix.com", "Netflix", "🎬"),
-        "amazon": ("https://www.amazon.in", "Amazon", "🛒"),
-        "instagram": ("https://www.instagram.com", "Instagram", "📸"),
-        "facebook": ("https://www.facebook.com", "Facebook", "👥"),
-        "github": ("https://www.github.com", "GitHub", "💻"),
-        "twitter": ("https://www.twitter.com", "Twitter", "🐦"),
-        "linkedin": ("https://www.linkedin.com", "LinkedIn", "💼"),
-        "spotify": ("https://open.spotify.com", "Spotify", "🎵"),
-        "hotstar": ("https://www.hotstar.com", "JioHotstar", "📺"),
-        "flipkart": ("https://www.flipkart.com", "Flipkart", "🛒"),
-        "myntra": ("https://www.myntra.com", "Myntra", "👗"),
-        "prime": ("https://www.primevideo.com", "Prime Video", "🎬"),
-        "cricbuzz": ("https://www.cricbuzz.com", "Cricbuzz", "🏏"),
-    }
-    
     # PLAY MUSIC
     if intent == "play_music":
         if "spotify" in text_lower:
-            return "🎵 Opening Spotify for you!", "https://open.spotify.com", "Spotify"
+            return "🎵 Opening Spotify!", "https://open.spotify.com", "Spotify"
         elif "youtube" in text_lower:
-            return "🎵 Playing music on YouTube!", "https://www.youtube.com/results?search_query=music", "YouTube Music"
-        elif "jiosaavn" in text_lower or "saavn" in text_lower:
-            return "🎵 Opening JioSaavn!", "https://www.jiosaavn.com", "JioSaavn"
-        elif "gaana" in text_lower:
-            return "🎵 Opening Gaana!", "https://gaana.com", "Gaana"
+            return "🎵 Playing on YouTube!", "https://www.youtube.com/results?search_query=music", "YouTube Music"
         else:
-            return "🎵 Opening YouTube Music for you!", "https://www.youtube.com/results?search_query=music", "YouTube Music"
+            return "🎵 Opening YouTube Music!", "https://www.youtube.com/results?search_query=music", "YouTube"
     
     # OPEN WEBSITE
     elif intent == "open_website":
-        for name, (url, display, emoji) in websites.items():
+        sites = {
+            "youtube": ("https://www.youtube.com", "YouTube"),
+            "google": ("https://www.google.com", "Google"),
+            "netflix": ("https://www.netflix.com", "Netflix"),
+            "amazon": ("https://www.amazon.in", "Amazon"),
+            "github": ("https://www.github.com", "GitHub"),
+            "instagram": ("https://www.instagram.com", "Instagram"),
+        }
+        for name, (url, display) in sites.items():
             if name in text_lower:
-                return f"{emoji} Opening {display}!", url, display
-        return "🌐 Which website would you like to open?", None, None
+                return f"🌐 Opening {display}!", url, display
+        return "Which website?", None, None
     
     # JOKES
     elif intent == "jokes_fun":
@@ -348,59 +246,24 @@ def perform_action(intent, text):
             "Why do programmers prefer dark mode? Because light attracts bugs! 😄",
             "Why did the computer get cold? It left its Windows open! 🪟",
             "Why do Java developers wear glasses? Because they can't C#! 👓",
-            "A SQL query walks into a bar, walks up to two tables and asks: Can I join you? 🍺",
-            "There are only 10 types of people: those who understand binary and those who don't! 🔢",
         ]
         return random.choice(jokes), None, None
     
     # NEWS
     elif intent == "news":
-        if "national" in text_lower or "india" in text_lower:
-            return "📰 Opening National News!", "https://news.google.com/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNREZqY0hwbEVnSmxiaWdBUAE?hl=en-IN", "National News"
-        elif "international" in text_lower or "world" in text_lower:
-            return "📰 Opening International News!", "https://news.google.com/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pKVGlnQVAB", "World News"
-        elif "sports" in text_lower:
-            return "📰 Opening Sports News!", "https://news.google.com/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pKVGlnQVAB", "Sports News"
-        else:
-            return "📰 Opening Google News!", "https://news.google.com", "Google News"
+        return "📰 Opening Google News!", "https://news.google.com", "Google News"
     
     # CRICKET
     elif intent == "cricket":
-        if "hotstar" in text_lower:
-            return "🏏 Opening JioHotstar for Live Cricket!", "https://www.hotstar.com/in/sports/cricket", "JioHotstar Cricket"
-        elif "cricbuzz" in text_lower:
-            return "🏏 Opening Cricbuzz!", "https://www.cricbuzz.com/cricket-match/live-scores", "Cricbuzz"
-        else:
-            return "🏏 Showing Live Cricket Scores!", "https://www.google.com/search?q=live+cricket+score", "Cricket Scores"
+        return "🏏 Cricket Scores!", "https://www.google.com/search?q=live+cricket+score", "Cricket"
     
     # MOVIES
     elif intent == "movies":
-        if "netflix" in text_lower:
-            return "🎬 Opening Netflix!", "https://www.netflix.com", "Netflix"
-        elif "prime" in text_lower:
-            return "🎬 Opening Prime Video!", "https://www.primevideo.com", "Prime Video"
-        elif "hotstar" in text_lower:
-            return "🎬 Opening Disney+ Hotstar!", "https://www.hotstar.com", "Hotstar"
-        else:
-            return "🎬 Opening Netflix!", "https://www.netflix.com", "Netflix"
-    
-    # SHOPPING
-    elif intent == "shopping":
-        if "flipkart" in text_lower:
-            return "🛒 Opening Flipkart!", "https://www.flipkart.com", "Flipkart"
-        elif "myntra" in text_lower:
-            return "🛒 Opening Myntra!", "https://www.myntra.com", "Myntra"
-        else:
-            return "🛒 Opening Amazon!", "https://www.amazon.in", "Amazon"
+        return "🎬 Opening Netflix!", "https://www.netflix.com", "Netflix"
     
     # WEATHER
     elif intent == "weather":
-        match = re.search(r"(?:in|of|for|at)\s+([a-zA-Z\s]+)", text_lower)
-        if match:
-            city = match.group(1).strip()
-            return f"🌦️ Weather in {city.title()}!", f"https://www.google.com/search?q=weather+in+{city.replace(' ', '+')}", "Weather"
-        else:
-            return "🌦️ Today's Weather!", "https://www.google.com/search?q=weather+today", "Weather"
+        return "🌦️ Weather Info!", "https://www.google.com/search?q=weather", "Weather"
     
     # DATE TIME
     elif intent == "date_time":
@@ -411,48 +274,31 @@ def perform_action(intent, text):
     elif intent == "calculator":
         nums = list(map(float, re.findall(r'\d+\.?\d*', text)))
         if len(nums) >= 2:
-            if any(w in text_lower for w in ["plus", "add", "+"]):
-                result = nums[0] + nums[1]
-                return f"🧮 {int(nums[0])} + {int(nums[1])} = **{int(result)}**", None, None
-            elif any(w in text_lower for w in ["minus", "subtract", "-"]):
-                result = nums[0] - nums[1]
-                return f"🧮 {int(nums[0])} - {int(nums[1])} = **{int(result)}**", None, None
-            elif any(w in text_lower for w in ["times", "multiply", "x", "*", "into"]):
-                result = nums[0] * nums[1]
-                return f"🧮 {int(nums[0])} × {int(nums[1])} = **{int(result)}**", None, None
-            elif any(w in text_lower for w in ["divide", "/"]):
-                if nums[1] != 0:
-                    result = nums[0] / nums[1]
-                    return f"🧮 {int(nums[0])} ÷ {int(nums[1])} = **{result:.2f}**", None, None
-        return "🧮 Try saying '5 plus 3' or '10 times 7'", None, None
+            if "plus" in text_lower or "add" in text_lower:
+                return f"🧮 {int(nums[0])} + {int(nums[1])} = **{int(nums[0] + nums[1])}**", None, None
+            elif "times" in text_lower or "multiply" in text_lower:
+                return f"🧮 {int(nums[0])} × {int(nums[1])} = **{int(nums[0] * nums[1])}**", None, None
+        return "🧮 Try '5 plus 3'", None, None
     
     # FACTS
     elif intent == "facts":
         facts = [
             "🍯 Honey never spoils! 3000-year-old honey was found in Egyptian tombs.",
-            "🐙 Octopuses have three hearts and blue blood!",
-            "🪐 A day on Venus is longer than a year on Venus.",
+            "🐙 Octopuses have three hearts!",
             "🍌 Bananas are berries, but strawberries are not!",
-            "🦈 Sharks are older than trees - around for 400 million years!",
         ]
         return random.choice(facts), None, None
     
     # PERSONALITY
     elif intent == "personality":
-        if any(w in text_lower for w in ["hello", "hi", "hey"]):
-            return "👋 Hello! How can I help you today?", None, None
-        elif "thank" in text_lower:
-            return "😊 You're welcome! Happy to help!", None, None
-        elif "how are you" in text_lower:
-            return "🤖 I'm doing great! How can I assist you?", None, None
-        return "🤖 I'm Alexa Mini, your AI assistant!", None, None
+        return "👋 Hello! I'm Alexa Mini, your AI assistant!", None, None
     
     # GENERAL QA
     elif intent == "general_qa":
         query = text.replace(" ", "+")
-        return f"🔍 Searching: '{text}'", f"https://www.google.com/search?q={query}", "Google Search"
+        return f"🔍 Searching...", f"https://www.google.com/search?q={query}", "Google"
     
-    return "❓ Try: 'open youtube', 'play music', 'tell me a joke'", None, None
+    return "❓ Try: 'open youtube', 'play music', 'tell joke'", None, None
 
 
 # ========================================
@@ -463,168 +309,127 @@ def main():
     st.markdown('<h1 class="main-header">🤖 Alexa Mini</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Your Personal AI Voice Assistant</p>', unsafe_allow_html=True)
     
-    # Initialize session state
+    # Initialize
     if 'history' not in st.session_state:
         st.session_state.history = []
     if 'vectorizer' not in st.session_state:
         st.session_state.vectorizer, st.session_state.model = load_classifier()
-    if 'last_url' not in st.session_state:
-        st.session_state.last_url = None
-    if 'last_site_name' not in st.session_state:
-        st.session_state.last_site_name = None
     
     # Sidebar
     with st.sidebar:
         st.markdown("### ⚙️ Settings")
-        
-        recording_duration = st.slider("🎤 Recording Duration", 3, 10, 5)
         enable_tts = st.checkbox("🔊 Text-to-Speech", value=True)
         
         st.markdown("---")
         st.markdown("### 📋 Quick Commands")
         
-        commands = {
-            "🎵 Music": ["play music", "play spotify", "play youtube music"],
-            "🌐 Websites": ["open youtube", "open google", "open github"],
-            "📰 News": ["show news", "national news", "sports news"],
-            "🏏 Cricket": ["cricket score", "cricket on hotstar", "live cricket"],
-            "🎬 Movies": ["open netflix", "open prime video", "open hotstar"],
-            "🛒 Shopping": ["open amazon", "open flipkart", "open myntra"],
-            "🌦️ Weather": ["weather today", "weather in mumbai"],
-            "😂 Fun": ["tell me a joke", "tell me a fact"],
-            "🧮 Math": ["5 plus 3", "10 times 7"],
-        }
+        quick_cmds = [
+            "open youtube",
+            "play music",
+            "tell me a joke",
+            "show news",
+            "cricket score",
+            "what time is it",
+        ]
         
-        for cat_idx, (category, cmds) in enumerate(commands.items()):
-            with st.expander(category):
-                for cmd_idx, cmd in enumerate(cmds):
-                    if st.button(cmd, key=f"qc_{cat_idx}_{cmd_idx}"):
-                        st.session_state.pending_command = cmd
+        for idx, cmd in enumerate(quick_cmds):
+            if st.button(cmd, key=f"qc_{idx}"):
+                st.session_state.pending = cmd
         
         st.markdown("---")
         if st.button("🗑️ Clear History"):
             st.session_state.history = []
             st.rerun()
     
-    # Main content
+    # Main
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # ========== VOICE INPUT ==========
+        # Voice Input
         st.markdown("### 🎤 Voice Input")
         
-        if st.button("🎙️ Click & Speak", use_container_width=True, key="record"):
-            status = st.empty()
-            audio_handler = AudioHandler(duration=recording_duration)
+        audio_bytes = audio_recorder(
+            text="🎙️ Click to Record",
+            recording_color="#e74c3c",
+            neutral_color="#3498db",
+            icon_name="microphone",
+            icon_size="3x"
+        )
+        
+        if audio_bytes:
+            st.audio(audio_bytes, format="audio/wav")
             
-            if audio_handler.record_audio(status):
-                with st.spinner("Processing..."):
-                    text = audio_handler.speech_to_text()
-                
-                if text:
-                    process_command(text, enable_tts)
-                else:
-                    st.error("⚠️ Couldn't understand. Please try again!")
-                
-                audio_handler.cleanup()
+            with st.spinner("🔄 Processing speech..."):
+                text = speech_to_text_from_bytes(audio_bytes)
+            
+            if text:
+                process_command(text, enable_tts)
+            else:
+                st.error("⚠️ Couldn't understand. Try again!")
         
         st.markdown("---")
         
-        # ========== TEXT INPUT ==========
+        # Text Input
         st.markdown("### ⌨️ Or Type Command")
         
-        # Check for pending command from sidebar
-        default_val = st.session_state.pop('pending_command', '')
+        default = st.session_state.pop('pending', '')
+        text_input = st.text_input("Command:", value=default, placeholder="e.g., open youtube")
         
-        text_input = st.text_input(
-            "Enter command:",
-            value=default_val,
-            placeholder="e.g., open youtube, play music, tell me a joke...",
-            key="text_cmd"
-        )
-        
-        if st.button("📤 Submit", use_container_width=True, key="submit"):
+        if st.button("📤 Submit", use_container_width=True):
             if text_input:
                 process_command(text_input, enable_tts)
-            else:
-                st.warning("Please enter a command!")
         
-        # Auto-process if there was a pending command
-        if default_val:
-            process_command(default_val, enable_tts)
+        if default:
+            process_command(default, enable_tts)
     
     with col2:
         st.markdown("### 📜 History")
         
         if st.session_state.history:
-            for i, item in enumerate(reversed(st.session_state.history[-10:])):
+            for i, item in enumerate(reversed(st.session_state.history[-5:])):
                 with st.expander(f"⏰ {item['time']}", expanded=(i == 0)):
-                    st.write(f"**You:** {item['command']}")
-                    st.write(f"**Alexa:** {item['response']}")
+                    st.write(f"**You:** {item['cmd']}")
+                    st.write(f"**Alexa:** {item['resp']}")
                     if item.get('url'):
-                        st.markdown(f"[🔗 {item.get('site_name', 'Open Link')}]({item['url']})")
+                        st.markdown(f"[🔗 Open]({item['url']})")
         else:
             st.info("No commands yet!")
     
-    # Footer
     st.markdown("---")
-    st.markdown(
-        "<div style='text-align:center; color:#666;'>Made with ❤️ | Alexa Mini Voice Assistant</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown("<div style='text-align:center;'>Made with ❤️ | Alexa Mini</div>", unsafe_allow_html=True)
 
 
-def process_command(text, enable_tts):
-    """Process a command and show results"""
+def process_command(text, tts):
+    """Process command"""
+    st.markdown(f'<div class="command-box">📝 "{text}"</div>', unsafe_allow_html=True)
     
-    # Show command
-    st.markdown(f'<div class="command-box">📝 <strong>"{text}"</strong></div>', unsafe_allow_html=True)
-    
-    # Predict intent
     X = st.session_state.vectorizer.transform([text.lower()])
     intent = st.session_state.model.predict(X)[0]
     confidence = max(st.session_state.model.predict_proba(X)[0])
     
-    st.info(f"🎯 Intent: **{intent}** ({confidence:.0%})")
+    st.info(f"🎯 **{intent}** ({confidence:.0%})")
     
-    # Get response
-    response, url, site_name = perform_action(intent, text)
+    response, url, site = perform_action(intent, text)
     
-    # Show response
     st.markdown(f'<div class="response-box">{response}</div>', unsafe_allow_html=True)
     
-    # ========== OPEN WEBSITE ==========
     if url:
-        st.success(f"🌐 Ready to open: **{site_name or 'Website'}**")
-        
-        # Method 1: Big clickable button (MOST RELIABLE)
-        open_website_button(url, f"🚀 Click to Open {site_name or 'Website'}")
-        
-        # Method 2: Try auto-open (may be blocked)
+        st.success(f"🌐 Ready: **{site}**")
+        open_website_button(url, f"🚀 Open {site}")
         open_website_auto(url)
-        
-        # Method 3: Direct link
-        st.markdown(f"**Direct Link:** [{url}]({url})")
     
-    # Text-to-Speech
-    if enable_tts:
-        audio_html = text_to_speech(response)
-        if audio_html:
-            st.markdown(audio_html, unsafe_allow_html=True)
+    if tts:
+        audio = text_to_speech(response)
+        if audio:
+            st.markdown(audio, unsafe_allow_html=True)
     
-    # Add to history
     st.session_state.history.append({
         'time': datetime.datetime.now().strftime('%I:%M %p'),
-        'command': text,
-        'intent': intent,
-        'response': response,
-        'url': url,
-        'site_name': site_name
+        'cmd': text,
+        'resp': response,
+        'url': url
     })
 
 
-# ========================================
-# 🚀 RUN
-# ========================================
 if __name__ == "__main__":
     main()
