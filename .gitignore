@@ -1,19 +1,10 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
 .Python
+*.so
+*.egg
 *.egg-info/
 dist/
 build/
@@ -22,31 +13,19 @@ build/
 .venv/
 venv/
 ENV/
-env/
 
-# Audio files (temporary)
+# Audio
 *.wav
-input.wav
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Models (too large for GitHub)
-*.pt
-*.pth
-models/
-
-# Logs
-*.log
-
-# API Keys (IMPORTANT!)
-config_private.py
-secrets.py
-.env
+# Package files (if not needed)
+setup.py
+pyproject.toml
+setup.cfg
