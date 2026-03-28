@@ -29,3 +29,8 @@ Thumbs.db
 setup.py
 pyproject.toml
 setup.cfg
+# Add to .gitignore
+uv.lock
+
+# Also add uv cache
+echo .uv/>> .gitignore
