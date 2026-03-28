@@ -1,40 +1,38 @@
 # Python
 __pycache__/
+*.py[cod]
 *.pyc
-*.pyo
 .Python
 *.so
-*.egg
-*.egg-info/
-dist/
-build/
 
 # Virtual Environment
 .venv/
 venv/
 ENV/
 
-# Audio
+# UV Package Manager
+uv.lock
+.uv/
+
+# Audio files
 *.wav
+input.wav
+temp_audio.wav
 
 # IDE
 .vscode/
 .idea/
+*.swp
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Package files (if not needed)
-setup.py
-pyproject.toml
-setup.cfg
-# Add to .gitignore
-uv.lock
+# Package managers
+*.egg-info/
+dist/
+build/
 
-# Also add uv cache
-echo .uv/>> .gitignore
-
-# UV Package Manager
-uv.lock
-.uv/
+# Secrets
+.env
+.streamlit/secrets.toml
