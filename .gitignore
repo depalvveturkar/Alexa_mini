@@ -34,3 +34,7 @@ uv.lock
 
 # Also add uv cache
 echo .uv/>> .gitignore
+
+# UV Package Manager
+uv.lock
+.uv/
